@@ -6,6 +6,16 @@ Law firms that specialize in consumer protection are fighting for their clients 
   <img width="620" height="520" alt="Screenshot 2026-06-12 at 3 24 19 PM" src="https://github.com/user-attachments/assets/ea77af97-0f14-488a-bdbd-c04efb19d1c4" />
 </div>
 
+## TLDR: Judging Alignment
+
+| Criterion (20% each)         | How seconds.ai addresses it                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Idea**                     | Law firms already pay for leads — seconds.ai delivers real-time, cited intelligence about potential consumer harm before competitors can react         |
+| **Technical Implementation** | Autonomous multi-agent architecture spanning ingestion → inference → notification, deployed as a real-time system on Render                            |
+| **Tool Use**                 | Seven sponsor tools each fulfill a distinct responsibility within the pipeline, creating a cohesive end-to-end solution                                |
+| **Presentation**             | 3-minute demo: a live consumer complaint gets ingested, scored by Pioneer, cited by Senso, and emailed to a subscribed law firm in real time           |
+| **Autonomy**                 | Guild.ai orchestrates the agents while Render maintains continuous deployment and execution — enabling a fully automated workflow from ingest to alert |
+
 ---
 
 ## Problem Statement
@@ -84,13 +94,3 @@ Once running, the pipeline requires zero manual intervention:
 A human only steps in to tune Pioneer ranking thresholds or add new sources to the watch list.
 
 ---
-
-## Judging Alignment
-
-| Criterion (20% each)         | How seconds.ai addresses it                                                                                                                            |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Idea**                     | Law firms already pay for leads — seconds.ai delivers real-time, cited intelligence about potential consumer harm before competitors can react         |
-| **Technical Implementation** | Autonomous multi-agent architecture spanning ingestion → inference → notification, deployed as a real-time system on Render                            |
-| **Tool Use**                 | Seven sponsor tools each fulfill a distinct responsibility within the pipeline, creating a cohesive end-to-end solution                                |
-| **Presentation**             | 3-minute demo: a live consumer complaint gets ingested, scored by Pioneer, cited by Senso, and emailed to a subscribed law firm in real time           |
-| **Autonomy**                 | Guild.ai orchestrates the agents while Render maintains continuous deployment and execution — enabling a fully automated workflow from ingest to alert |
