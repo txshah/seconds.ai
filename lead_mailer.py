@@ -48,7 +48,7 @@ def fetch_leads_from_clickhouse(min_score: float = 0.9) -> list[dict]:
         "SELECT post_id, post, pioneer_score, pioneer_label, "
         "complaint_type, source_url, signal_score, keywords, profit "
         "FROM posts WHERE signal_score >= {score:Float32} "
-        "ORDER BY signal_score DESC",
+        "ORDER BY signal_score DESC LIMIT 1",
         parameters={"score": min_score},
     )
     columns = result.column_names
