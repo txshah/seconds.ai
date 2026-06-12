@@ -159,16 +159,6 @@ Downstream teammates add their own keys (Pioneer / Composio / Senso / Guild / Re
 | **Presentation** | 3-minute demo walks through a live Reddit post being ingested, scored, emailed, and cited in real time |
 | **Autonomy** | Once deployed, the agent monitors, decides, and acts without any human in the loop |
 
----
-
-## Prize Targets
-
-- Most Innovative Use of Agents — **Guild.ai** ($2,800)
-- Best Use of **ClickHouse** ($1,600)
-- Best Use of **Pioneer** ($500)
-- Best Agent Execution — **Composio** ($200)
-- Best Use of **Render** ($1,000 credits)
-- Best Use of **Senso.ai** ($2,000 credits)
 
 ---
 
@@ -176,8 +166,3 @@ Downstream teammates add their own keys (Pioneer / Composio / Senso / Guild / Re
 
 Built in one day at the Harness Engineering Hack, June 12, 2026.
 
----
-
-## License
-
-MIT
