@@ -1,0 +1,62 @@
+{
+    "id": "2a3f11a3-dff1-4d4b-9107-9a7da1936be6",
+    "user_id": "2324eddf-6a4f-4828-a869-f9aaf8d142e8",
+    "project_id": "026a0162-61d9-4c3c-8d1e-1339b73ffb0d",
+    "model_name": "LawClassActionClassifier",
+    "datasets": [
+        {
+            "name": "seconds-ai-legal-data",
+            "version": "1"
+        }
+    ],
+    "base_model": "fastino/gliner2-base-v1",
+    "validation_data_percentage": 0.2,
+    "nr_epochs": 5,
+    "learning_rate": 5e-05,
+    "batch_size": 4,
+    "trained_model_path": "adapters/2324eddf-6a4f-4828-a869-f9aaf8d142e8/2a3f11a3-dff1-4d4b-9107-9a7da1936be6",
+    "job_reference": "modal:fc-01KTYNT5NHXP7G274BVEP1W06K",
+    "instance_type": "modal-l4",
+    "status": "deployed",
+    "normalized_status": "complete",
+    "is_terminal_status": true,
+    "error_message": null,
+    "created_at": "2026-06-12T19:44:14.502756+00:00",
+    "updated_at": "2026-06-12T19:46:08.199548+00:00",
+    "started_at": "2026-06-12T19:44:41.203136+00:00",
+    "completed_at": "2026-06-12T19:46:07.325056+00:00",
+    "model_auto_selected": false,
+    "model_selection_reason": null,
+    "task_type": "classification",
+    "labels": [
+        "class_action_candidate",
+        "tcpa_violation",
+        "fcra_violation",
+        "fdcpa_violation",
+        "data_breach",
+        "subscription_trap",
+        "deceptive_advertising",
+        "product_liability",
+        "privacy_violation",
+        "consumer_fraud",
+        "not_actionable"
+    ],
+    "example": null,
+    "metrics": {
+        "final_training_loss": 1.858087,
+        "final_validation_loss": 2.198215,
+        "best_validation_loss": 2.131381
+    },
+    "version_number": "1",
+    "root_job_id": null,
+    "provider_deployments": {
+        "modal": {
+            "status": "active",
+            "normalized_adapter_path": "adapters/2324eddf-6a4f-4828-a869-f9aaf8d142e8/2a3f11a3-dff1-4d4b-9107-9a7da1936be6"
+        }
+    },
+    "provider_name": "modal",
+    "progress_percent": null,
+    "current_epoch": null,
+    "deployment_status": null
+}

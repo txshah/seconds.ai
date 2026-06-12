@@ -1,133 +1,92 @@
-# seconds.ai — Consumer Lawsuit Intelligence Agent
+# seconds.ai — Consumer Lawsuit Intelligence for Law Firms
 
-> Built at the **Harness Engineering Hack** · June 12, 2026 · AWS Builder Loft, SF
-
-Consumers get scammed every day and never know they have legal recourse. Lawyers who specialize in consumer protection struggle to find clients at the exact moment they're venting about being wronged. **seconds.ai** closes that gap: a fully autonomous agent pipeline that monitors public discourse, detects potential class-action and individual consumer lawsuits in real time, and connects affected consumers with relevant attorneys via email — all cited, traceable, and live on the web.
+Law firms that specialize in consumer protection are fighting for their clients — but they're losing time. By the time a complaint surfaces, gets reviewed, and reaches the right attorney, the window has often closed. **seconds.ai** is a fully autonomous agent pipeline that finds those moments in real time, scores them, and puts actionable intelligence in front of the right firm — in seconds.
 
 ---
 
 ## Problem Statement
 
-Millions of consumer complaints surface on Reddit, forums, and social media every day — data breaches, subscription traps, defective products, deceptive advertising. Most consumers don't know they have legal standing. Most plaintiff attorneys don't see these signals until months later, when a class is already certified and the moment has passed.
+Every day, thousands of consumers post about being wronged: data breaches, deceptive subscriptions, defective products, predatory practices. Law firms that care about these clients can't monitor all of it manually. They miss leads. They miss clients who needed them.
 
-**seconds.ai** turns that lag into seconds.
+The gap isn't expertise — it's time. Law firms are reactive because the tools they have make them reactive.
 
----
-
-## What It Does
-
-1. **Ingest** — A scheduled Guild.ai agent polls Reddit continuously, pulling posts from communities like r/legaladvice, r/mildlyinfuriating, r/personalfinance, and company-specific subreddits. Every complaint is a potential lead.
-
-2. **Store & Trace** — Raw posts and extracted entities land in ClickHouse. Every row carries a full provenance chain: source URL, subreddit, timestamp, ingestion run ID. Judges and end-users can see exactly how each finding was surfaced.
-
-3. **Rank** — A Pioneer-fine-tuned model scores each complaint for legal relevance: Is this a pattern? Is there an existing class action? What federal or state statute might apply? The model outputs a ranked list with confidence scores.
-
-4. **Cite** — Senso.ai publishes the agent's reasoning and sources as a live, citable web artifact. Every conclusion the agent reaches links back to the evidence. `cited.md` (auto-generated per run) provides a markdown-formatted citation trail for transparency.
-
-5. **Act** — Composio connects to Gmail and sends two targeted emails per qualifying lead:
-   - A plain-language summary to the **consumer** explaining their potential recourse.
-   - A structured lead alert to **subscribed attorneys** filtered by practice area and jurisdiction.
-
-6. **Deploy & Monitor** — The full pipeline runs on Render. Guild.ai orchestrates the schedule, Langfuse traces every LLM call, and ClickHouse dashboards show real-time pipeline health.
+**seconds.ai** makes them proactive. The pipeline monitors public discourse continuously, identifies legally relevant complaints, and delivers structured, cited intelligence directly to subscribed firms — so they can act for their clients before anyone else does.
 
 ---
 
-## Architecture
+## How It Works
 
-```
-Reddit API
-    │
-    ▼
-Guild.ai (scheduled agent, timer-triggered)
-    │  ingests posts on interval
-    ▼
-ClickHouse (raw + enriched tables, full provenance)
-    │  analytics & trace queries
-    ▼
-Pioneer (fine-tuned ranker)
-    │  legal relevance score + statute tagging
-    ▼
-Senso.ai (web-published agent output + cited.md)
-    │  live citations, shareable URLs
-    ▼
-Composio → Gmail
-    │  consumer alert + attorney lead email
-    ▼
-Render (deployed, always-on)
-```
+Guild.ai orchestrates three agents that run end-to-end without human intervention:
+
+**1. Ingestion Agent** — Powered by Firecrawl, this agent continuously scrapes Reddit threads, forums, and consumer complaint boards. Every post is extracted, deduplicated, and stored in ClickHouse with a full provenance trail: source URL, timestamp, and run ID.
+
+**2. Pioneer Agent** — Runs inference on our fine-tuned Pioneer model against everything in ClickHouse. It scores each complaint for legal relevance, tags applicable federal and state statutes, and flags patterns that indicate a viable case. Only high-confidence signals move forward.
+
+**3. Notification Agent** — Composio triggers personalized outreach based on each firm's subscription preferences — practice area, jurisdiction, and case type. Subscribed firms receive a structured alert containing the complaint summary, Pioneer score, and a link to the full cited output. Senso saves the agent's reasoning and sources to `cite.md` so every finding remains auditable and shareable.
 
 ---
 
-## Sponsor Tool Usage
+## Real-Time Infrastructure
 
-| Tool | Role in Pipeline |
-|---|---|
-| **Guild.ai** | Orchestrates the ingestion agent on a recurring timer; manages agent lifecycle and retries |
-| **ClickHouse** | Stores all raw and processed records with full analytic capability; powers the provenance/trace dashboard |
-| **Pioneer** | Fine-tuned model that ranks complaints by legal relevance, classifies statute type, and filters noise |
-| **Composio** | Gmail integration that sends personalized consumer alerts and attorney lead emails without manual intervention |
-| **Render** | Hosts the API layer, agent runner, and dashboard; zero-downtime deploys |
-| **Senso.ai** | Publishes agent outputs as citable, web-accessible artifacts — the agent's reasoning is transparent and linkable |
+To support continuous monitoring and instant notifications, **seconds.ai** is deployed entirely on **Render**.
+
+Render hosts our real-time services and ensures the pipeline remains always-on and production-ready. It coordinates communication between our infrastructure components:
+
+* **Render → ClickHouse:** Queries newly ingested consumer complaints and provides the Pioneer agent access to historical and real-time data for scoring.
+* **Render → Composio:** Triggers automated outreach workflows whenever Pioneer identifies a qualifying legal signal.
+* **Render → Agent Services:** Deploys and manages the ingestion, inference, and notification services powering the entire system.
+
+By deploying on Render, we gain automatic scaling, simplified infrastructure management, and reliable execution of our end-to-end autonomous pipeline.
 
 ---
 
-## cited.md
+## Tool Usage
 
-Every pipeline run generates a `cited.md` file that documents:
+| Tool           | Role in Pipeline                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Guild.ai**   | Orchestrates all three agents on a recurring schedule; manages lifecycle, retries, and agent handoffs                           |
+| **Firecrawl**  | Powers the ingestion agent — scrapes Reddit, forums, and complaint boards and feeds structured data downstream                  |
+| **ClickHouse** | Stores every ingested record with full provenance; Pioneer queries it for scoring; dashboards show pipeline health in real time |
+| **Pioneer**    | Fine-tuned model that scores complaints by legal relevance, classifies statute type, and filters noise — the intelligence layer |
+| **Composio**   | Connects the notification agent to Gmail; sends subscription-filtered alerts to law firms without any manual step               |
+| **Senso.ai**   | Publishes the agent's reasoning and sources as a live, citable artifact — every finding links back to evidence via `cite.md`    |
+| **Render**     | Hosts and deploys the real-time system, coordinating agent services and facilitating communication with ClickHouse and Composio |
 
-- The source posts used (Reddit URL, timestamp, subreddit)
-- The ClickHouse query that retrieved them
-- The Pioneer model version and score thresholds applied
-- The final consumer/attorney outputs with reasoning
+---
 
-This file is auto-committed to the repo and published via Senso.ai so any output the agent produces is fully auditable.
+## Senso + Composio: From Finding to Firm
+
+When Pioneer flags a qualifying complaint, two things happen simultaneously:
+
+* **Senso** writes the agent's full reasoning — source posts, statute tags, confidence score, and supporting evidence — to `cite.md` and publishes it as a live, linkable web artifact. The law firm receives a URL they can open, share, and file.
+* **Composio** sends Gmail alerts to every subscribed firm whose practice area and jurisdiction match the finding. The email includes a plain-language summary, the Pioneer score, and the Senso citation link.
+
+Together, they transform a raw consumer complaint into a structured, cited, attorney-ready lead — automatically.
 
 ---
 
 ## Autonomy
 
-The agent requires **zero manual intervention** after deploy:
+Once running, the pipeline requires zero manual intervention:
 
-- Guild.ai fires the ingestion job on schedule
-- ClickHouse deduplicates re-ingested posts automatically
-- Pioneer scores and filters without human review
-- Composio sends emails only when confidence exceeds threshold
-- Senso.ai publishes the updated citation page after each run
+* Guild.ai fires all three agents on schedule and handles retries
+* Firecrawl deduplicates re-crawled content before it reaches ClickHouse
+* Pioneer scores and filters complaints without human review
+* Render hosts and maintains the real-time services powering the system
+* Render triggers queries to ClickHouse and coordinates notification workflows through Composio
+* Composio sends alerts only when confidence exceeds the predefined threshold
+* Senso publishes updated citation pages after every qualifying run
 
-A human only steps in to tune the Pioneer ranking threshold or add new subreddits to the watch list.
+A human only steps in to tune Pioneer ranking thresholds or add new sources to the watch list.
 
----
-
-## Setup
-
-```bash
-git clone https://github.com/<your-handle>/seconds-ai
-cd seconds-ai
-cp .env.example .env  # fill in API keys
-pip install -r requirements.txt
-
-# Run the full pipeline locally
-python pipeline/run.py
-
-# Deploy to Render
-render deploy
-```
 ---
 
 ## Judging Alignment
 
-| Criterion (20% each) | How seconds.ai addresses it |
-|---|---|
-| **Idea** | Consumer protection is a proven pain point; the attorney lead-gen creates a sustainable revenue model alongside the consumer-facing utility |
-| **Technical Implementation** | End-to-end pipeline from ingestion → ranking → email → web publish, all wired together with real APIs |
-| **Tool Use** | Six sponsor tools each handle the job they're best at; no gratuitous use |
-| **Presentation** | 3-minute demo walks through a live Reddit post being ingested, scored, emailed, and cited in real time |
-| **Autonomy** | Once deployed, the agent monitors, decides, and acts without any human in the loop |
-
-
----
-
-## Team
-
-Built in one day at the Harness Engineering Hack, June 12, 2026.
-
+| Criterion (20% each)         | How seconds.ai addresses it                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Idea**                     | Law firms already pay for leads — seconds.ai delivers real-time, cited intelligence about potential consumer harm before competitors can react         |
+| **Technical Implementation** | Autonomous multi-agent architecture spanning ingestion → inference → notification, deployed as a real-time system on Render                            |
+| **Tool Use**                 | Seven sponsor tools each fulfill a distinct responsibility within the pipeline, creating a cohesive end-to-end solution                                |
+| **Presentation**             | 3-minute demo: a live consumer complaint gets ingested, scored by Pioneer, cited by Senso, and emailed to a subscribed law firm in real time           |
+| **Autonomy**                 | Guild.ai orchestrates the agents while Render maintains continuous deployment and execution — enabling a fully automated workflow from ingest to alert |
