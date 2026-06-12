@@ -6,6 +6,33 @@ Consumers get scammed every day and never know they have legal recourse. Lawyers
 
 ---
 
+## ✅ Built & live — start here (for the team)
+
+The **ingestion + data layer** is built and running on ClickHouse **Cloud**. If
+you're picking this up, the one doc to read is **[HANDOFF.md](HANDOFF.md)** — it is
+the contract (DB creds, the `posts` view to read, the `rankings` table to write,
+and the `/leads` + `/cases` API).
+
+| Layer | Where | Status |
+|---|---|---|
+| Scraping | Guild.ai + Firecrawl (`guild/`); Reddit RSS backup (`app/scraper/`) | ✅ working |
+| Storage | ClickHouse **Cloud** (`app/schema.sql`) — 75+ real leads | ✅ live |
+| Handoff API | FastAPI (`app/api.py`) — `/leads`, `/cases`, `/leads/export.jsonl` | ✅ working |
+| Ranking (Pioneer) | reads `posts` view → writes `rankings` table | 🟡 handoff ready |
+| Cite / Email / Deploy | Senso / Composio / Render | ⬜ downstream |
+
+**Run locally** (no accounts needed for the RSS path):
+```bash
+make install     # deps into .venv
+make db          # local ClickHouse (separate terminal) — or set CLICKHOUSE_* for Cloud
+make bootstrap   # create schema
+make ingest      # one scrape -> store cycle (Reddit RSS)
+make serve       # API on :8000  (docs at /docs)
+```
+Cloud / Firecrawl / Guild / Render setup → **[DEPLOY.md](DEPLOY.md)**.
+
+---
+
 ## Problem Statement
 
 Millions of consumer complaints surface on Reddit, forums, and social media every day — data breaches, subscription traps, defective products, deceptive advertising. Most consumers don't know they have legal standing. Most plaintiff attorneys don't see these signals until months later, when a class is already certified and the moment has passed.
@@ -35,25 +62,20 @@ Millions of consumer complaints surface on Reddit, forums, and social media ever
 ## Architecture
 
 ```
-Reddit API
-    │
-    ▼
-Guild.ai (scheduled agent, timer-triggered)
-    │  ingests posts on interval
-    ▼
-ClickHouse (raw + enriched tables, full provenance)
-    │  analytics & trace queries
-    ▼
-Pioneer (fine-tuned ranker)
-    │  legal relevance score + statute tagging
-    ▼
-Senso.ai (web-published agent output + cited.md)
-    │  live citations, shareable URLs
-    ▼
-Composio → Gmail
-    │  consumer alert + attorney lead email
-    ▼
-Render (deployed, always-on)
+Guild.ai agent (scheduled)  ──Firecrawl search: Reddit + open web──┐
+   (app/scraper RSS = local/backup source)                        │
+                                                                   ▼
+                                  POST /leads/ingest  →  enrich · dedup · store
+                                                                   │
+                                                                   ▼
+        ClickHouse Cloud   tables: raw_posts · leads · rankings · ingest_runs
+                           views:  posts (Pioneer read) · case_signals (class-action rollup)
+                                                                   │
+                                                                   ▼
+        Pioneer  — reads `posts`, ranks, writes `rankings` → rolls up into case_signals
+                                                                   │
+                                                                   ▼
+        Senso.ai (cite)   ·   Composio → Gmail (alert consumer + law firm)   ·   Render (host)
 ```
 
 ---
@@ -101,34 +123,29 @@ A human only steps in to tune the Pioneer ranking threshold or add new subreddit
 ## Setup
 
 ```bash
-git clone https://github.com/<your-handle>/seconds-ai
-cd seconds-ai
-cp .env.example .env  # fill in API keys
-pip install -r requirements.txt
+git clone https://github.com/txshah/seconds.ai
+cd seconds.ai
+cp .env.example .env        # fill in CLICKHOUSE_* (Cloud) and FIRECRAWL_API_KEY
+make install                # deps into .venv
 
-# Run the full pipeline locally
-python pipeline/run.py
-
-# Deploy to Render
-render deploy
+make bootstrap              # create the ClickHouse schema
+make ingest                 # Reddit RSS         -> ClickHouse
+make firecrawl              # Firecrawl (web+reddit) -> ClickHouse  (needs FIRECRAWL_API_KEY)
+make serve                  # handoff API on :8000  (docs at /docs)
 ```
 
-### Required Environment Variables
+### Environment Variables (this layer)
+
+Full list with comments in [.env.example](.env.example). The ingestion + DB layer needs:
 
 ```
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-CLICKHOUSE_HOST=
-CLICKHOUSE_USER=
+CLICKHOUSE_HOST=        # <service>.<region>.clickhouse.cloud   (PORT=8443, SECURE=true)
+CLICKHOUSE_USER=default
 CLICKHOUSE_PASSWORD=
-PIONEER_API_KEY=
-COMPOSIO_API_KEY=
-GMAIL_ACCOUNT=
-SENSO_API_KEY=
-GUILD_API_KEY=
-LANGFUSE_PUBLIC_KEY=
-LANGFUSE_SECRET_KEY=
+FIRECRAWL_API_KEY=      # for the Guild.ai / Firecrawl acquisition path
 ```
+
+Downstream teammates add their own keys (Pioneer / Composio / Senso / Guild / Render).
 
 ---
 
