@@ -2,6 +2,8 @@
 
 Law firms that specialize in consumer protection are fighting for their clients — but they're losing time. By the time a complaint surfaces, gets reviewed, and reaches the right attorney, the window has often closed. **seconds.ai** is a fully autonomous agent pipeline that finds those moments in real time, scores them, and puts actionable intelligence in front of the right firm — in seconds.
 
+[seconds-ai on render](https://seconds-ai.onrender.com/) 
+
 <div align="center">
   <img width="620" height="520" alt="Screenshot 2026-06-12 at 3 24 19 PM" src="https://github.com/user-attachments/assets/ea77af97-0f14-488a-bdbd-c04efb19d1c4" />
 </div>
