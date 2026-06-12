@@ -1409,6 +1409,7 @@ def home():
           <button onclick="runDemo()">Analyze Signals</button>
           <a class="btn secondary" href="/cited.md" target="_blank">Open cited.md</a>
           <button class="secondary" onclick="publishSenso()">Publish artifact</button>
+          <button class="secondary" onclick="notifyUser()">Notify User</button>
         </div>
 
         <div class="limit-control">
@@ -1704,6 +1705,23 @@ async function publishSenso() {
   const res = await fetch("/publish-senso", { method: "POST" });
   const data = await res.json();
   alert(`${data.status}: ${data.message}`);
+}
+
+
+function notifyUser() {
+  const selectedSignal = results[selected] || null;
+
+  if (!selectedSignal) {
+    alert("Run analysis and select a signal first.");
+    return;
+  }
+
+  alert(
+    "Notification prepared for approved demo recipient.\n\n" +
+    "Signal: " + (selectedSignal.pioneer_label || "N/A") + "\n" +
+    "Confidence: " + (selectedSignal.risk_score || selectedSignal.pioneer_score || "N/A") + "%\n" +
+    "Source: " + (selectedSignal.source_url || "N/A")
+  );
 }
 
 window.onload = runDemo;
