@@ -6,9 +6,9 @@ from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
 
-from pipeline.db import get_client
-from pipeline.pioneer_finetuner import PioneerFinetuner
-from pipeline.pioneer_ranker import PioneerRanker
+from pioneer.db import get_client
+from pioneer.pioneer_finetuner import PioneerFinetuner
+from pioneer.pioneer_ranker import PioneerRanker
 
 OUTPUT_FILE = Path(__file__).parent.parent / "rankings_output.json"
 

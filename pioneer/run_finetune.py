@@ -10,7 +10,7 @@ import os
 
 from dotenv import load_dotenv
 
-from pipeline.pioneer_finetuner import PioneerFinetuner
+from pioneer.pioneer_finetuner import PioneerFinetuner
 
 
 def main() -> None:
@@ -23,7 +23,7 @@ def main() -> None:
     use_real_posts = os.environ.get("USE_REAL_POSTS", "").strip() in ("1", "true", "yes")
 
     if use_real_posts:
-        from pipeline.db import get_client
+        from pioneer.db import get_client
         db = get_client()
     else:
         db = None

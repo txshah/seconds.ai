@@ -7,7 +7,7 @@ import anthropic
 from pydantic import BaseModel, ValidationError
 
 if TYPE_CHECKING:
-    from pipeline.pioneer_finetuner import PioneerFinetuner
+    from pioneer.pioneer_finetuner import PioneerFinetuner
 
 logger = logging.getLogger(__name__)
 
