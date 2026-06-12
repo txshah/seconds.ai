@@ -1409,6 +1409,7 @@ def home():
           <button onclick="runDemo()">Analyze Signals</button>
           <a class="btn secondary" href="/cited.md" target="_blank">Open cited.md</a>
           <button class="secondary" onclick="publishSenso()">Publish artifact</button>
+          <button class="secondary" onclick="sendTelegramAlert()">Send Telegram Alert</button>
         </div>
 
         <div class="limit-control">
@@ -1704,6 +1705,40 @@ async function publishSenso() {
   const res = await fetch("/publish-senso", { method: "POST" });
   const data = await res.json();
   alert(`${data.status}: ${data.message}`);
+}
+
+
+async function sendTelegramAlert() {
+  const selectedSignal = results[selected] || null;
+
+  if (!selectedSignal) {
+    alert("Run analysis and select a signal first.");
+    return;
+  }
+
+  const payload = {
+    signal: selectedSignal
+  };
+
+  try {
+    const res = await fetch("/send-alert", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (data.sent) {
+      alert("Telegram alert sent to demo firm.");
+    } else {
+      alert(`${data.status || "failed"}: ${data.message || "Telegram alert failed."}`);
+    }
+
+    console.log("Telegram alert response:", data);
+  } catch (e) {
+    alert("Telegram alert failed: " + e.message);
+  }
 }
 
 window.onload = runDemo;
