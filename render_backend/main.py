@@ -4,7 +4,8 @@ import datetime
 from typing import Dict, Any, List, Optional
 
 import requests
-from fastapi import FastAPI
+import clickhouse_connect
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -29,6 +30,238 @@ LAST_SENSO_STATUS: Dict[str, Any] = {
     "status": "not_generated",
     "message": "Run the demo first to generate a citable evidence artifact.",
 }
+
+
+
+def clickhouse_configured() -> bool:
+    required = [
+        "CLICKHOUSE_HOST",
+        "CLICKHOUSE_USER",
+        "CLICKHOUSE_PASSWORD",
+        "CLICKHOUSE_DATABASE",
+    ]
+    return all(os.getenv(k) for k in required)
+
+
+def get_clickhouse_client():
+    if not clickhouse_configured():
+        raise RuntimeError("ClickHouse is not configured")
+
+    return clickhouse_connect.get_client(
+        host=os.getenv("CLICKHOUSE_HOST"),
+        port=int(os.getenv("CLICKHOUSE_PORT", "8443")),
+        username=os.getenv("CLICKHOUSE_USER"),
+        password=os.getenv("CLICKHOUSE_PASSWORD"),
+        database=os.getenv("CLICKHOUSE_DATABASE"),
+        secure=True,
+    )
+
+
+def safe_table_name(name: str) -> bool:
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
+    return bool(name) and all(c in allowed for c in name)
+
+
+def list_clickhouse_tables() -> list:
+    client = get_clickhouse_client()
+    result = client.query("SHOW TABLES")
+    return [row[0] for row in result.result_rows]
+
+
+def describe_clickhouse_table(table: str) -> list:
+    if not safe_table_name(table):
+        raise ValueError("Unsafe table name")
+
+    client = get_clickhouse_client()
+    result = client.query(f"DESCRIBE TABLE {table}")
+    return [row[0] for row in result.result_rows]
+
+
+def find_best_results_table() -> str:
+    preferred = os.getenv("CLICKHOUSE_RESULTS_TABLE")
+    if preferred:
+        return preferred
+
+    tables = list_clickhouse_tables()
+
+    # Prefer names that sound like model outputs / inference results
+    priority_terms = [
+        "inference",
+        "result",
+        "pioneer",
+        "prediction",
+        "classified",
+        "classification",
+        "complaint",
+        "dataset",
+    ]
+
+    scored = []
+    for t in tables:
+        name_score = sum(1 for term in priority_terms if term in t.lower())
+        try:
+            cols = describe_clickhouse_table(t)
+            colset = set(cols)
+            schema_score = sum(
+                1 for c in [
+                    "post_id",
+                    "post",
+                    "pioneer_score",
+                    "pioneer_label",
+                    "complaint_type",
+                    "source_url",
+                    "keywords",
+                    "signal_score",
+                ]
+                if c in colset
+            )
+            scored.append((schema_score * 10 + name_score, t))
+        except Exception:
+            scored.append((name_score, t))
+
+    scored.sort(reverse=True)
+
+    if not scored or scored[0][0] <= 0:
+        raise RuntimeError("Could not infer ClickHouse results table. Set CLICKHOUSE_RESULTS_TABLE.")
+
+    return scored[0][1]
+
+
+def normalize_clickhouse_value(v):
+    if v is None:
+        return None
+    if isinstance(v, (list, tuple)):
+        return [normalize_clickhouse_value(x) for x in v]
+    return v
+
+
+def parse_arrayish(v):
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return [str(x).strip() for x in v if str(x).strip()]
+    if isinstance(v, tuple):
+        return [str(x).strip() for x in v if str(x).strip()]
+    if isinstance(v, str):
+        text = v.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+        except Exception:
+            pass
+        return [x.strip() for x in text.replace("[", "").replace("]", "").replace("'", "").split(",") if x.strip()]
+    return [str(v)]
+
+
+def fetch_clickhouse_results(limit: int = 20) -> list:
+    table = find_best_results_table()
+    if not safe_table_name(table):
+        raise ValueError("Unsafe table name")
+
+    cols = describe_clickhouse_table(table)
+    colset = set(cols)
+
+    wanted = [
+        "post_id",
+        "post",
+        "pioneer_score",
+        "pioneer_label",
+        "complaint_type",
+        "taxonomy",
+        "signal_score",
+        "source_url",
+        "companies",
+        "keywords",
+    ]
+    selected = [c for c in wanted if c in colset]
+
+    if not selected:
+        raise RuntimeError(f"No expected columns found in ClickHouse table: {table}")
+
+    order_col = "pioneer_score" if "pioneer_score" in colset else selected[0]
+
+    query = f"""
+        SELECT {", ".join(selected)}
+        FROM {table}
+        ORDER BY {order_col} DESC
+        LIMIT {int(limit)}
+    """
+
+    client = get_clickhouse_client()
+    result = client.query(query)
+
+    rows = []
+    for raw in result.result_rows:
+        item = {}
+        for idx, col in enumerate(selected):
+            item[col] = normalize_clickhouse_value(raw[idx])
+        item["_clickhouse_table"] = table
+        rows.append(item)
+
+    return rows
+
+
+
+def count_clickhouse_rows(table: str) -> int:
+    if not safe_table_name(table):
+        raise ValueError("Unsafe table name")
+
+    client = get_clickhouse_client()
+    result = client.query(f"SELECT count() FROM {table}")
+    return int(result.result_rows[0][0])
+
+
+def enrich_clickhouse_row(item: Dict[str, Any]) -> Dict[str, Any]:
+    post = str(item.get("post") or "")
+    title = post.split("\n")[0][:160] if post else "Untitled signal"
+
+    pioneer_score = float(item.get("pioneer_score") or 0)
+    signal_score = float(item.get("signal_score") or 0)
+
+    # If score is stored as 0-1, convert to percent for UI.
+    risk_percent = pioneer_score * 100 if pioneer_score <= 1 else pioneer_score
+    signal_percent = signal_score * 100 if signal_score <= 1 else signal_score
+
+    label = str(item.get("pioneer_label") or "unclassified signal")
+    complaint_type = str(item.get("complaint_type") or "unknown")
+    source_url = str(item.get("source_url") or "")
+    keywords = parse_arrayish(item.get("keywords"))
+    companies = parse_arrayish(item.get("companies"))
+
+    if not source_url:
+        source_url = "No source URL provided"
+
+    return {
+        "post_id": str(item.get("post_id") or "unknown"),
+        "company": companies[0] if companies else "Entity not extracted",
+        "title": title,
+        "text": post[:1200],
+        "source_url": source_url,
+        "source_type": get_source_type(source_url),
+        "pioneer_score": pioneer_score,
+        "risk_score": round(risk_percent, 1),
+        "signal_score": round(signal_percent, 1),
+        "risk_level": risk_level(pioneer_score if pioneer_score <= 1 else pioneer_score / 100),
+        "pioneer_label": label,
+        "complaint_type": complaint_type,
+        "taxonomy": str(item.get("taxonomy") or ""),
+        "keywords": keywords,
+        "companies": companies,
+        "reasoning": (
+            f"Pioneer classified this source as '{label}' with "
+            f"{round(risk_percent, 1)}% confidence."
+            + (f" Keywords: {', '.join(keywords)}." if keywords else "")
+        ),
+        "plain_language_summary": f"Potential {label} signal detected.",
+        "recommended_action": "Review source evidence and route to consumer-protection/legal intake team.",
+        "model_source": "clickhouse_pioneer_result",
+        "clickhouse_table": item.get("_clickhouse_table"),
+        "timestamp": now_iso(),
+    }
+
 
 
 DEMO_EXAMPLES = [
@@ -207,14 +440,44 @@ def health():
         "pioneer_mode": "cached_outputs",
         "senso_configured": bool(os.getenv("SENSO_API_KEY") and os.getenv("SENSO_INGEST_URL")),
         "composio_configured": bool(os.getenv("COMPOSIO_API_KEY")),
+        "clickhouse_configured": clickhouse_configured(),
     }
 
 
 @app.post("/run-demo")
-def run_demo():
+def run_demo(limit: int = Query(20, ge=1, le=100)):
     global LATEST_RESULTS, LAST_CITED_MD, LAST_SENSO_STATUS
 
-    results = [enrich_example(x) for x in DEMO_EXAMPLES]
+    mode = "cached_demo_examples"
+    table_used = None
+    clickhouse_error = None
+    total_available = None
+
+    effective_limit = int(limit)
+
+    try:
+        if clickhouse_configured():
+            table_used = find_best_results_table()
+            total_available = count_clickhouse_rows(table_used)
+
+            raw_rows = fetch_clickhouse_results(limit=effective_limit)
+            results = [enrich_clickhouse_row(x) for x in raw_rows]
+
+            if results:
+                mode = "clickhouse_pioneer_results"
+                table_used = results[0].get("clickhouse_table") or table_used
+            else:
+                results = [enrich_example(x) for x in DEMO_EXAMPLES[:effective_limit]]
+                total_available = len(DEMO_EXAMPLES)
+        else:
+            results = [enrich_example(x) for x in DEMO_EXAMPLES[:effective_limit]]
+            total_available = len(DEMO_EXAMPLES)
+
+    except Exception as e:
+        clickhouse_error = str(e)
+        results = [enrich_example(x) for x in DEMO_EXAMPLES[:effective_limit]]
+        total_available = len(DEMO_EXAMPLES)
+
     results = sorted(results, key=lambda x: x["risk_score"], reverse=True)
 
     LATEST_RESULTS = results
@@ -229,17 +492,21 @@ def run_demo():
     }
 
     high_risk_count = sum(1 for r in results if r["risk_level"] in ["critical", "high"])
+    avg_score = round(sum(float(r.get("risk_score", 0)) for r in results) / len(results), 1) if results else 0
 
     return {
         "status": "demo_completed",
-        "mode": "cached_pioneer_outputs",
+        "mode": mode,
+        "clickhouse_table": table_used,
+        "clickhouse_error": clickhouse_error,
+        "requested_limit": effective_limit,
         "count": len(results),
+        "total_available": total_available,
         "high_risk_count": high_risk_count,
-        "avg_pioneer_score": round(sum(r["risk_score"] for r in results) / len(results), 1),
+        "avg_pioneer_score": avg_score,
         "results": results,
         "senso": LAST_SENSO_STATUS,
     }
-
 
 @app.get("/latest-results")
 def latest_results():
@@ -369,7 +636,84 @@ def send_alert():
         "status": "demo_stub",
         "message": "Composio alert action placeholder. In final demo, this sends only to approved demo/team recipients.",
         "composio_configured": bool(os.getenv("COMPOSIO_API_KEY")),
+        "clickhouse_configured": clickhouse_configured(),
     }
+
+
+@app.get("/clickhouse/health")
+def clickhouse_health():
+    if not clickhouse_configured():
+        return {
+            "status": "not_configured",
+            "message": "Set CLICKHOUSE_HOST, CLICKHOUSE_USER, CLICKHOUSE_PASSWORD, and CLICKHOUSE_DATABASE.",
+        }
+
+    try:
+        client = get_clickhouse_client()
+        version = client.query("SELECT version()").result_rows[0][0]
+        tables = list_clickhouse_tables()
+        best_table = None
+        try:
+            best_table = find_best_results_table()
+        except Exception as e:
+            best_table = f"not inferred: {e}"
+
+        return {
+            "status": "ok",
+            "version": version,
+            "database": os.getenv("CLICKHOUSE_DATABASE"),
+            "table_count": len(tables),
+            "tables": tables,
+            "best_results_table": best_table,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e),
+        }
+
+
+@app.get("/clickhouse/tables")
+def clickhouse_tables():
+    try:
+        tables = list_clickhouse_tables()
+        out = []
+        for t in tables:
+            try:
+                out.append({"table": t, "columns": describe_clickhouse_table(t)})
+            except Exception as e:
+                out.append({"table": t, "error": str(e)})
+        return {"status": "ok", "tables": out}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/clickhouse/preview")
+def clickhouse_preview(table: Optional[str] = None, limit: int = 5):
+    try:
+        table = table or find_best_results_table()
+        if not safe_table_name(table):
+            return {"status": "error", "message": "Unsafe table name"}
+
+        cols = describe_clickhouse_table(table)
+        selected = cols[: min(len(cols), 12)]
+
+        client = get_clickhouse_client()
+        result = client.query(f"SELECT {', '.join(selected)} FROM {table} LIMIT {int(limit)}")
+
+        rows = []
+        for raw in result.result_rows:
+            rows.append({col: normalize_clickhouse_value(raw[i]) for i, col in enumerate(selected)})
+
+        return {
+            "status": "ok",
+            "table": table,
+            "columns": cols,
+            "preview": rows,
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -533,6 +877,27 @@ def home():
       color: var(--black);
       border: 1px solid var(--line);
       box-shadow: none;
+    }
+
+
+    .limit-control {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .limit-control select {
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--black);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-weight: 800;
+      outline: none;
     }
 
     .legal-note {
@@ -1045,6 +1410,17 @@ def home():
           <a class="btn secondary" href="/cited.md" target="_blank">Open cited.md</a>
           <button class="secondary" onclick="publishSenso()">Publish artifact</button>
         </div>
+
+        <div class="limit-control">
+          <span>Show</span>
+          <select id="limitSelect" onchange="runDemo()">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+          <span id="totalAvailable">of — total</span>
+        </div>
         <div class="legal-note">
           Not legal advice. Demo uses cached Pioneer inference from the created dataset for fast presentation.
         </div>
@@ -1071,7 +1447,7 @@ def home():
     </section>
 
     <section class="metrics">
-      <div class="metric"><div class="value" id="totalSignals">3</div><div class="label">Sources</div></div>
+      <div class="metric"><div class="value" id="totalSignals">—</div><div class="label">Showing / total</div></div>
       <div class="metric"><div class="value" id="highRisk">—</div><div class="label">High confidence</div></div>
       <div class="metric"><div class="value" id="avgScore">—</div><div class="label">Avg Pioneer</div></div>
       <div class="metric"><div class="value">1</div><div class="label">Cited artifact</div></div>
@@ -1177,13 +1553,16 @@ async function runDemo() {
     markSteps(i);
   }
 
-  const res = await fetch("/run-demo", { method: "POST" });
+  const limit = document.getElementById("limitSelect")?.value || "10";
+  const res = await fetch(`/run-demo?limit=${limit}`, { method: "POST" });
   const data = await res.json();
 
   results = data.results || [];
   selected = 0;
 
-  document.getElementById("totalSignals").textContent = data.count;
+  const total = data.total_available || data.count;
+  document.getElementById("totalSignals").textContent = `${data.count}/${total}`;
+  document.getElementById("totalAvailable").textContent = `of ${total} total`;
   document.getElementById("highRisk").textContent = data.high_risk_count;
   document.getElementById("avgScore").textContent = pct(data.avg_pioneer_score);
   document.getElementById("runStatus").textContent = "Complete";
