@@ -112,24 +112,6 @@ python pipeline/run.py
 # Deploy to Render
 render deploy
 ```
-
-### Required Environment Variables
-
-```
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-CLICKHOUSE_HOST=
-CLICKHOUSE_USER=
-CLICKHOUSE_PASSWORD=
-PIONEER_API_KEY=
-COMPOSIO_API_KEY=
-GMAIL_ACCOUNT=
-SENSO_API_KEY=
-GUILD_API_KEY=
-LANGFUSE_PUBLIC_KEY=
-LANGFUSE_SECRET_KEY=
-```
-
 ---
 
 ## Judging Alignment
@@ -142,16 +124,6 @@ LANGFUSE_SECRET_KEY=
 | **Presentation** | 3-minute demo walks through a live Reddit post being ingested, scored, emailed, and cited in real time |
 | **Autonomy** | Once deployed, the agent monitors, decides, and acts without any human in the loop |
 
----
-
-## Prize Targets
-
-- Most Innovative Use of Agents — **Guild.ai** ($2,800)
-- Best Use of **ClickHouse** ($1,600)
-- Best Use of **Pioneer** ($500)
-- Best Agent Execution — **Composio** ($200)
-- Best Use of **Render** ($1,000 credits)
-- Best Use of **Senso.ai** ($2,000 credits)
 
 ---
 
@@ -159,8 +131,3 @@ LANGFUSE_SECRET_KEY=
 
 Built in one day at the Harness Engineering Hack, June 12, 2026.
 
----
-
-## License
-
-MIT
