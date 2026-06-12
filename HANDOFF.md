@@ -48,14 +48,14 @@ Work straight against ClickHouse with the shared creds — no app code required.
 ```
 host:     tqof521f2x.us-west-2.aws.clickhouse.cloud
 port:     8443   (HTTPS / secure)
-user:     default
+user:     pioneer        # scoped: SELECT on seconds.*, INSERT on seconds.rankings
 password: (shared privately — not in this repo)
 database: seconds
 ```
 ```python
 import clickhouse_connect
 c = clickhouse_connect.get_client(host="…clickhouse.cloud", port=8443,
-        username="default", password="…", secure=True, database="seconds")
+        username="pioneer", password="…", secure=True, database="seconds")
 ```
 
 **Read — the `posts` view** (shaped to your requested spec, always fresh):
