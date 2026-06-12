@@ -1,0 +1,16 @@
+
+# Python / Render backend
+render_backend/.venv/
+render_backend/__pycache__/
+__pycache__/
+*.pyc
+.env
+render_backend/.env
+
+# Render backend local files
+render_backend/.venv/
+render_backend/__pycache__/
+__pycache__/
+*.pyc
+.env
+render_backend/.env

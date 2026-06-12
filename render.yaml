@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: seconds-ai-api
+    runtime: python
+    rootDir: render_backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DEMO_MODE
+        value: "true"
+      - key: PIONEER_BASE_URL
+        value: "https://api.pioneer.ai/v1/chat/completions"
+      - key: PIONEER_MODEL
+        value: "LawClassActionClassifier"
