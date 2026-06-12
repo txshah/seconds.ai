@@ -46,7 +46,7 @@ def fetch_leads_from_clickhouse(min_score: float = 0.9) -> list[dict]:
     )
     result = client.query(
         "SELECT post_id, post, pioneer_score, pioneer_label, "
-        "complaint_type, source_url, signal_score, keywords "
+        "complaint_type, source_url, signal_score, keywords, profit "
         "FROM posts WHERE signal_score >= {score:Float32} "
         "ORDER BY signal_score DESC",
         parameters={"score": min_score},
@@ -80,6 +80,9 @@ def send_lead_to_firm(pioneer_data: dict, chat_id: str) -> dict:
         post_id, post, pioneer_score, pioneer_label,
         complaint_type, source_url, keywords, signal_score
     """
+    profit = pioneer_data.get("profit")
+    estimated_payout = f"${float(profit):,.2f}" if profit is not None else "N/A"
+
     message = (
         f"<b>New Lead Detected by seconds.ai</b>\n\n"
         f"<b>Classification:</b> {(pioneer_data.get('pioneer_label') or 'N/A').title()}\n"
@@ -89,6 +92,7 @@ def send_lead_to_firm(pioneer_data: dict, chat_id: str) -> dict:
         f"<b>Complaint:</b>\n{pioneer_data.get('post', 'N/A')}\n\n"
         f"<b>Source:</b> {pioneer_data.get('source_url', 'N/A')}\n"
         f"<b>Keywords:</b> {', '.join(pioneer_data.get('keywords') or [])}\n"
+        f"<b>Estimated Payout:</b> {estimated_payout}\n"
         f"<b>Post ID:</b> <code>{pioneer_data.get('post_id', 'N/A')}</code>\n\n"
         f"<i>Powered by seconds.ai — review and reach out to the consumer directly.</i>"
     )
