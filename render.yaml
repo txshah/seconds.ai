@@ -1,0 +1,32 @@
+# Render blueprint for the seconds.ai handoff API.
+# Note: on Render you MUST use ClickHouse Cloud (the local binary isn't reachable);
+# set the CLICKHOUSE_* secrets in the dashboard. Deploy: connect the repo, Render
+# reads this file. The Guild agent then calls https://<service>.onrender.com/leads/ingest.
+services:
+  - type: web
+    name: seconds-ai-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: CLICKHOUSE_HOST
+        sync: false
+      - key: CLICKHOUSE_PORT
+        value: "8443"
+      - key: CLICKHOUSE_USER
+        value: default
+      - key: CLICKHOUSE_PASSWORD
+        sync: false
+      - key: CLICKHOUSE_SECURE
+        value: "true"
+      - key: CLICKHOUSE_DATABASE
+        value: seconds
+      - key: API_INGEST_TOKEN
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
