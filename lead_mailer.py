@@ -7,31 +7,31 @@ load_dotenv()
 
 TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 
-# Registry of subscribed law firms.
-# label_keywords matches against pioneer_label or complaint_type.
-# Use "*" as a wildcard that matches any lead.
-FIRM_REGISTRY = [
-    {
-        "name": "McCarthy Law",
-        "chat_id": os.environ.get("TELEGRAM_MCCARTHY_LAW", ""),
-        "label_keywords": ["fdcpa", "debt_collection"],
-    },
-    {
-        "name": "Rivera & Partners",
-        "chat_id": os.environ.get("TELEGRAM_RIVERA_PARTNERS", ""),
-        "label_keywords": ["fdcpa", "fcra", "debt_collection"],
-    },
-    {
-        "name": "Sam & Ash Law",
-        "chat_id": os.environ.get("TELEGRAM_SAM_ASH_LAW", ""),
-        "label_keywords": ["product liability", "defective_product"],
-    },
-    {
-        "name": "General Consumer Rights Group",
-        "chat_id": os.environ.get("TELEGRAM_GENERAL_CONSUMER", ""),
-        "label_keywords": ["*"],
-    },
-]
+def _load_firm_registry() -> list[dict]:
+    """
+    Load firms from .env. Add firms by defining sets of:
+      FIRM_<N>_NAME, FIRM_<N>_CHAT_ID, FIRM_<N>_KEYWORDS (comma-separated)
+    where N starts at 1. Loading stops at the first missing FIRM_<N>_NAME.
+    """
+    firms = []
+    i = 1
+    while True:
+        name = os.environ.get(f"FIRM_{i}_NAME")
+        if not name:
+            break
+        firms.append({
+            "name": name,
+            "chat_id": os.environ.get(f"FIRM_{i}_CHAT_ID", ""),
+            "label_keywords": [
+                kw.strip()
+                for kw in os.environ.get(f"FIRM_{i}_KEYWORDS", "*").split(",")
+            ],
+        })
+        i += 1
+    return firms
+
+
+FIRM_REGISTRY = _load_firm_registry()
 
 
 def fetch_leads_from_clickhouse(min_score: float = 0.9) -> list[dict]:
